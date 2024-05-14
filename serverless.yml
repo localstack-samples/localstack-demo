@@ -38,10 +38,10 @@ provider:
 
 package:
   excludeDevDependencies: true
-  exclude:
-    - ./**
-    - "!demo/**"
-    - "!node_modules/uuid/**"
+  patterns:
+    - "!./**"
+    - "demo/**"
+    - "node_modules/uuid/**"
 
 custom:
   region: us-east-1
