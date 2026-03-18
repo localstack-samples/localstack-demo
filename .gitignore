@@ -1,4 +1,6 @@
 *.pyc
-.serverless/
 node_modules
 .idea/
+cdk.out
+.DS_Store
+vendor/
