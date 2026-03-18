@@ -1,0 +1,119 @@
+name: Integration Test
+
+on:
+  push:
+    paths-ignore:
+      - 'README.md'
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  schedule:
+    # "At 00:00 on Sunday."
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          working-directory: demo/lambdas/ruby
+
+      - name: Setup LocalStack
+        uses: localstack/setup-localstack@main
+        with:
+          image-tag: 'latest'
+          use-pro: 'true'
+          configuration: LS_LOG=trace
+          install-awslocal: 'true'
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+
+      - name: Install CDK dependencies
+        run: cd cdk && npm ci
+
+      - name: Bundle Ruby Lambda gems
+        working-directory: demo/lambdas/ruby
+        run: |
+          bundle config set --local path vendor/bundle
+          bundle install
+
+      - name: Install Node.js Lambda dependencies
+        run: cd demo/lambdas/nodejs && npm install --omit=dev
+
+      - name: Bootstrap CDK
+        working-directory: cdk
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+        run: npx cdklocal bootstrap
+
+      - name: Deploy CDK stack
+        working-directory: cdk
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+        run: npx cdklocal deploy LocalstackDemoStack --require-approval never
+
+      - name: Upload frontend to S3
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://localhost.localstack.cloud:4566
+        run: awslocal s3 sync demo/web/ s3://archive-bucket/
+
+      - name: Run end-to-end test
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://localhost.localstack.cloud:4566
+        run: |
+          echo "Discovering REST API ID..."
+          apiId=$(awslocal apigateway get-rest-apis --output json \
+            | jq -r '.items[] | select(.name=="localstack-demo") | .id')
+          echo "API ID: $apiId"
+
+          echo "Sending new request..."
+          reqID=$(curl -sf -d '{}' \
+            "http://localhost:4566/_aws/execute-api/$apiId/local/requests" \
+            | jq -r .requestID)
+          echo "Request ID: $reqID"
+
+          echo "Polling for QUEUED -> PROCESSING -> FINISHED..."
+          for i in $(seq 1 25); do
+            cur=$(curl -sf \
+              "http://localhost:4566/_aws/execute-api/$apiId/local/requests" \
+              | jq -r "[.result[] | select(.requestID==\"$reqID\") | .status] | sort | last")
+            echo "  attempt $i: $cur"
+            [ "$cur" = "FINISHED" ] && break
+            sleep 3
+          done
+
+          echo "Verifying S3 result file..."
+          awslocal s3 cp "s3://archive-bucket/$reqID/result.txt" - | grep -q "Archive result" \
+            && echo "✅ End-to-end test passed!" \
+            || (echo "❌ S3 result not found" && exit 1)
+
+      - name: LocalStack logs (on failure)
+        if: failure()
+        run: localstack logs

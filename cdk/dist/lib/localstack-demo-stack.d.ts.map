@@ -1,0 +1,1 @@
+{"version":3,"file":"localstack-demo-stack.d.ts","sourceRoot":"","sources":["../../lib/localstack-demo-stack.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,GAAG,MAAM,aAAa,CAAC;AACnC,OAAO,EAAE,SAAS,EAAE,MAAM,YAAY,CAAC;AAWvC,qBAAa,mBAAoB,SAAQ,GAAG,CAAC,KAAK;gBACpC,KAAK,EAAE,SAAS,EAAE,EAAE,EAAE,MAAM,EAAE,KAAK,CAAC,EAAE,GAAG,CAAC,UAAU;CAqIjE"}
