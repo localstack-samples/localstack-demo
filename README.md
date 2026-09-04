@@ -34,10 +34,10 @@ The following diagram shows the architecture that this sample application builds
 
 ## Prerequisites
 
-- A valid [LocalStack for AWS license](https://localstack.cloud/pricing). Your license provides a [`LOCALSTACK_AUTH_TOKEN`](https://docs.localstack.cloud/getting-started/auth-token/) to activate LocalStack.
-- [`localstack` CLI](https://docs.localstack.cloud/getting-started/installation/#localstack-cli).
-- [AWS CLI](https://docs.localstack.cloud/user-guide/integrations/aws-cli/) with the [`awslocal` wrapper](https://docs.localstack.cloud/user-guide/integrations/aws-cli/#localstack-aws-cli-awslocal).
-- [CDK](https://docs.localstack.cloud/user-guide/integrations/aws-cdk/) with the [`cdklocal`](https://www.npmjs.com/package/aws-cdk-local) wrapper (installed automatically via `cdk/package.json`).
+- A valid [LocalStack for AWS license](https://localstack.cloud/pricing). Your license provides a [`LOCALSTACK_AUTH_TOKEN`](https://docs.localstack.cloud/aws/getting-started/auth-token/) to activate LocalStack.
+- [`lstk` CLI](https://docs.localstack.cloud/aws/developer-tools/running-localstack/lstk/), installed via `npm install -g @localstack/lstk` or `brew install localstack/tap/lstk`.
+- [AWS CLI](https://docs.localstack.cloud/user-guide/integrations/aws-cli/), required by `lstk aws`.
+- [CDK](https://docs.localstack.cloud/user-guide/integrations/aws-cdk/) installed globally (`npm install -g aws-cdk`), used via the `lstk cdk` proxy.
 - [Node.js 22+](https://nodejs.org/en/download/)
 - [Docker](https://docs.docker.com/get-docker/) — required to bundle Ruby Lambda gems.
 - [`jq`](https://jqlang.github.io/jq/download/)
@@ -65,7 +65,6 @@ Set your LocalStack auth token and start LocalStack:
 ```bash
 export LOCALSTACK_AUTH_TOKEN=<your-auth-token>
 make start
-make ready
 ```
 
 Deploy the full stack (bundles Lambda dependencies, bootstraps CDK, deploys, uploads frontend):
@@ -126,7 +125,7 @@ Polling s3://archive-bucket/ for result ...
 You can also browse the contents of the archive bucket directly:
 
 ```bash
-awslocal s3 ls s3://archive-bucket/
+lstk aws s3 ls s3://archive-bucket/
 ```
 
 ## Summary
@@ -136,7 +135,7 @@ This sample application demonstrates how to build and test a polyglot serverless
 - Defining AWS infrastructure (API Gateway, Lambda, SQS, Step Functions, DynamoDB, S3) entirely with **AWS CDK in TypeScript**.
 - Running **three Lambda runtimes** (Node.js, Python, Ruby) side-by-side in the same CDK stack.
 - Serving a **React frontend from S3** that auto-discovers the API Gateway endpoint and polls for status updates.
-- Using `cdklocal` and `awslocal` to streamline **local deployment and testing** without touching real AWS.
+- Using the `lstk cdk` and `lstk aws` proxies to streamline **local deployment and testing** without touching real AWS.
 - Providing a **GitHub Actions workflow** that runs the full integration test suite on every push.
 
 ## Learn More
