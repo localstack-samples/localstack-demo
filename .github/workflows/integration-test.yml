@@ -35,15 +35,10 @@ jobs:
           ruby-version: '3.3'
           working-directory: demo/lambdas/ruby
 
-      - name: Setup LocalStack
-        uses: localstack/setup-localstack@main
-        with:
-          image-tag: 'latest'
-          use-pro: 'true'
-          configuration: LS_LOG=trace
-          install-awslocal: 'true'
-        env:
-          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+      - name: Install lstk
+        run: |
+          npm install -g @localstack/lstk aws-cdk
+          lstk setup aws
 
       - name: Install CDK dependencies
         run: cd cdk && npm ci
@@ -57,13 +52,20 @@ jobs:
       - name: Install Node.js Lambda dependencies
         run: cd demo/lambdas/nodejs && npm install --omit=dev
 
+      - name: Start LocalStack
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+        run: |
+          docker pull localstack/localstack-pro:latest
+          LOCALSTACK_LS_LOG=trace lstk start
+
       - name: Bootstrap CDK
         working-directory: cdk
         env:
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test
           AWS_DEFAULT_REGION: us-east-1
-        run: npx cdklocal bootstrap
+        run: lstk cdk bootstrap
 
       - name: Deploy CDK stack
         working-directory: cdk
@@ -71,7 +73,7 @@ jobs:
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test
           AWS_DEFAULT_REGION: us-east-1
-        run: npx cdklocal deploy LocalstackDemoStack --require-approval never
+        run: lstk cdk deploy LocalstackDemoStack --require-approval never
 
       - name: Upload frontend to S3
         env:
@@ -79,7 +81,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: test
           AWS_DEFAULT_REGION: us-east-1
           AWS_ENDPOINT_URL: http://localhost.localstack.cloud:4566
-        run: awslocal s3 sync demo/web/ s3://archive-bucket/
+        run: lstk aws s3 sync demo/web/ s3://archive-bucket/
 
       - name: Run end-to-end test
         env:
@@ -89,7 +91,7 @@ jobs:
           AWS_ENDPOINT_URL: http://localhost.localstack.cloud:4566
         run: |
           echo "Discovering REST API ID..."
-          apiId=$(awslocal apigateway get-rest-apis --output json \
+          apiId=$(lstk aws apigateway get-rest-apis --output json \
             | jq -r '.items[] | select(.name=="localstack-demo") | .id')
           echo "API ID: $apiId"
 
@@ -110,10 +112,10 @@ jobs:
           done
 
           echo "Verifying S3 result file..."
-          awslocal s3 cp "s3://archive-bucket/$reqID/result.txt" - | grep -q "Archive result" \
+          lstk aws s3 cp "s3://archive-bucket/$reqID/result.txt" - | grep -q "Archive result" \
             && echo "✅ End-to-end test passed!" \
             || (echo "❌ S3 result not found" && exit 1)
 
       - name: LocalStack logs (on failure)
         if: failure()
-        run: localstack logs
+        run: lstk logs
